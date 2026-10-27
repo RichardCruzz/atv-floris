@@ -10,12 +10,10 @@ import { ClienteFactory } from './factories/ClienteFactory.js';
 import { VeiculoFactory } from './factories/VeiculoFactory.js';
 import { clearDatabase } from './utils/clearDatabase.js';
 
-// Mock da API externa de CEP (ViaCEP): nenhum teste depende da internet.
 vi.mock('axios', () => ({
     default: { get: vi.fn() }
 }));
 
-// Resposta simulada do ViaCEP para o CEP 01001-000.
 const RESPOSTA_VIACEP = {
     data: {
         logradouro: 'Praça da Sé',
@@ -25,28 +23,28 @@ const RESPOSTA_VIACEP = {
     }
 };
 
-// Helpers para consultar o banco de testes diretamente.
 async function listar(tabela) {
     const [rows] = await connection.execute(`SELECT * FROM ${tabela}`);
     return rows;
 }
 
 async function buscarPorId(tabela, id) {
-    const [rows] = await connection.execute(`SELECT * FROM ${tabela} WHERE Id = ?`, [id]);
+    const [rows] = await connection.execute(
+        `SELECT * FROM ${tabela} WHERE Id = ?`,
+        [id]
+    );
     return rows[0];
 }
 
-/* ------------------------------------------------------------------ */
-/* Suíte: Clientes (CT-001 a CT-006)                                  */
-/* ------------------------------------------------------------------ */
+/* CLIENTES: CT-001 a CT-006 */
+
 describe('API de clientes', () => {
     afterEach(async () => {
         await clearDatabase();
-
         vi.resetAllMocks();
     });
 
-    it('CT-001 - deve cadastrar um cliente com dados válidos e retornar 201.', async () => {
+    it('CT-001 - deve cadastrar um cliente com dados válidos.', async () => {
         axios.get.mockResolvedValueOnce(RESPOSTA_VIACEP);
 
         const response = await request(app)
@@ -60,9 +58,12 @@ describe('API de clientes', () => {
             });
 
         expect(response.status).toBe(201);
-        expect(axios.get).toHaveBeenCalledWith('https://viacep.com.br/ws/01001000/json/');
+        expect(axios.get).toHaveBeenCalledWith(
+            'https://viacep.com.br/ws/01001000/json/'
+        );
 
         const clientes = await listar('clientes');
+
         expect(clientes).toHaveLength(1);
         expect(clientes[0].CPF).toBe('12345678900');
         expect(clientes[0].Logradouro).toBe('Praça da Sé');
@@ -70,8 +71,6 @@ describe('API de clientes', () => {
     });
 
     it('CT-002 - não deve cadastrar um cliente sem nome.', async () => {
-        axios.get.mockResolvedValueOnce(RESPOSTA_VIACEP);
-
         const response = await request(app)
             .post('/clientes')
             .send({
@@ -87,9 +86,17 @@ describe('API de clientes', () => {
 
     it('CT-003 - não deve cadastrar um cliente com CPF duplicado.', async () => {
         await ClienteFactory.create(
-            'João Souza', '12345678900', '01001000',
-            'Rua A', 'Centro', 'São Paulo', 'SP', '10', null
+            'João Souza',
+            '12345678900',
+            '01001000',
+            'Rua A',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '10',
+            null
         );
+
         axios.get.mockResolvedValueOnce(RESPOSTA_VIACEP);
 
         const response = await request(app)
@@ -105,35 +112,64 @@ describe('API de clientes', () => {
         expect(response.body.message).toBeDefined();
 
         const clientes = await listar('clientes');
-        expect(clientes.filter(c => c.CPF === '12345678900')).toHaveLength(1);
+
+        expect(
+            clientes.filter(c => c.CPF === '12345678900')
+        ).toHaveLength(1);
     });
 
-    it('CT-004 - deve consultar um cliente existente e retornar os dados corretos.', async () => {
+    it('CT-004 - deve consultar um cliente existente.', async () => {
         await ClienteFactory.create(
-            'Ana Lima', '11122233344', '01001000',
-            'Rua B', 'Centro', 'São Paulo', 'SP', '20', null
+            'Ana Lima',
+            '11122233344',
+            '01001000',
+            'Rua B',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '20',
+            null
         );
+
         const cliente = await ClienteFactory.create(
-            'João Souza', '98765432100', '01001000',
-            'Rua A', 'Centro', 'São Paulo', 'SP', '10', null
+            'João Souza',
+            '98765432100',
+            '01001000',
+            'Rua A',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '10',
+            null
         );
 
         const response = await request(app).get('/clientes');
 
         expect(response.status).toBe(200);
 
-        const encontrado = response.body.data.find(c => c.Id === cliente.id);
+        const encontrado = response.body.data.find(
+            c => c.Id === cliente.id
+        );
+
         expect(encontrado).toBeDefined();
         expect(encontrado.Nome).toBe('João Souza');
         expect(encontrado.CPF).toBe('98765432100');
         expect(encontrado.Cidade).toBe('São Paulo');
     });
 
-    it('CT-005 - deve atualizar os dados de um cliente existente.', async () => {
+    it('CT-005 - deve atualizar um cliente existente.', async () => {
         const cliente = await ClienteFactory.create(
-            'João Souza', '98765432100', '01001000',
-            'Rua A', 'Centro', 'São Paulo', 'SP', '10', null
+            'João Souza',
+            '98765432100',
+            '01001000',
+            'Rua A',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '10',
+            null
         );
+
         axios.get.mockResolvedValueOnce({
             data: {
                 logradouro: 'Avenida Paulista',
@@ -154,10 +190,16 @@ describe('API de clientes', () => {
             });
 
         expect(response.status).toBe(200);
-        expect(response.body.message).toBe('Cliente atualizado com sucesso');
-        expect(axios.get).toHaveBeenCalledWith('https://viacep.com.br/ws/01310100/json/');
+        expect(response.body.message).toBe(
+            'Cliente atualizado com sucesso'
+        );
+
+        expect(axios.get).toHaveBeenCalledWith(
+            'https://viacep.com.br/ws/01310100/json/'
+        );
 
         const atualizado = await buscarPorId('clientes', cliente.id);
+
         expect(atualizado.Nome).toBe('João Souza Atualizado');
         expect(atualizado.CEP).toBe('01310100');
         expect(atualizado.Logradouro).toBe('Avenida Paulista');
@@ -173,9 +215,8 @@ describe('API de clientes', () => {
     });
 });
 
-/* ------------------------------------------------------------------ */
-/* Suíte: Montadoras (CT-007 a CT-009)                                */
-/* ------------------------------------------------------------------ */
+/* MONTADORAS: CT-007 a CT-009 */
+
 describe('API de montadoras', () => {
     let montadora;
 
@@ -185,19 +226,25 @@ describe('API de montadoras', () => {
 
     afterEach(async () => {
         await clearDatabase();
-
         vi.resetAllMocks();
     });
 
     it('CT-007 - deve cadastrar uma montadora válida.', async () => {
         const response = await request(app)
             .post('/montadoras')
-            .send({ nome: 'Hyundai', pais: 'Coreia do Sul' });
+            .send({
+                nome: 'Hyundai',
+                pais: 'Coreia do Sul'
+            });
 
         expect(response.status).toBe(201);
         expect(response.body.data).toHaveProperty('insertId');
 
-        const criada = await buscarPorId('montadoras', response.body.data.insertId);
+        const criada = await buscarPorId(
+            'montadoras',
+            response.body.data.insertId
+        );
+
         expect(criada.Nome).toBe('Hyundai');
         expect(criada.Pais).toBe('Coreia do Sul');
     });
@@ -209,8 +256,6 @@ describe('API de montadoras', () => {
 
         expect(response.status).toBe(500);
         expect(response.body.error).toBe('Nome inválido');
-
-        // Apenas a Toyota criada no beforeEach deve existir.
         expect(await listar('montadoras')).toHaveLength(1);
     });
 
@@ -225,9 +270,8 @@ describe('API de montadoras', () => {
     });
 });
 
-/* ------------------------------------------------------------------ */
-/* Suíte: Veículos (CT-010 a CT-015)                                  */
-/* ------------------------------------------------------------------ */
+/* VEÍCULOS: CT-010 a CT-015 */
+
 describe('API de veículos', () => {
     let montadora;
     let cliente;
@@ -244,14 +288,28 @@ describe('API de veículos', () => {
     });
 
     const criarVeiculo = () => VeiculoFactory.create(
-        'Corolla', 'ABC1D23', 2020, 'Preto', 98000, cliente.id, montadora.id
+        'Corolla',
+        'ABC1D23',
+        2020,
+        'Preto',
+        98000,
+        cliente.id,
+        montadora.id
     );
 
     beforeEach(async () => {
         montadora = await MontadoraFactory.create('Toyota', 'Japão');
+
         cliente = await ClienteFactory.create(
-            'Ana Lima', '11122233344', '01001000',
-            'Rua B', 'Centro', 'São Paulo', 'SP', '20', null
+            'Ana Lima',
+            '11122233344',
+            '01001000',
+            'Rua B',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '20',
+            null
         );
     });
 
@@ -267,7 +325,11 @@ describe('API de veículos', () => {
         expect(response.status).toBe(201);
         expect(response.body.data).toHaveProperty('insertId');
 
-        const criado = await buscarPorId('veiculos', response.body.data.insertId);
+        const criado = await buscarPorId(
+            'veiculos',
+            response.body.data.insertId
+        );
+
         expect(criado.Modelo).toBe('Corolla');
         expect(criado.IdMontadora).toBe(montadora.id);
         expect(criado.IdCliente).toBe(cliente.id);
@@ -285,7 +347,6 @@ describe('API de veículos', () => {
     });
 
     it('CT-012 - não deve cadastrar um veículo sem montadora.', async () => {
-        // idMontadora undefined é omitido na serialização do JSON.
         const response = await request(app)
             .post('/veiculos')
             .send(dadosVeiculo({ idMontadora: undefined }));
@@ -302,7 +363,10 @@ describe('API de veículos', () => {
 
         expect(response.status).toBe(200);
 
-        const encontrado = response.body.data.find(v => v.Id === veiculo.id);
+        const encontrado = response.body.data.find(
+            v => v.Id === veiculo.id
+        );
+
         expect(encontrado).toBeDefined();
         expect(encontrado.Modelo).toBe('Corolla');
         expect(encontrado.Placa).toBe('ABC1D23');
@@ -318,15 +382,25 @@ describe('API de veículos', () => {
 
         const response = await request(app)
             .put(`/veiculos?id=${veiculo.id}`)
-            .send(dadosVeiculo({ modelo: 'Corolla XEi', ano: 2021, cor: 'Branco', valor: 105000 }));
+            .send(
+                dadosVeiculo({
+                    modelo: 'Corolla XEi',
+                    ano: 2021,
+                    cor: 'Branco',
+                    valor: 105000
+                })
+            );
 
         expect(response.status).toBe(200);
-        expect(response.body.message).toBe('Veículo atualizado com sucesso');
+        expect(response.body.message).toBe(
+            'Veículo atualizado com sucesso'
+        );
 
         const veiculos = await listar('veiculos');
         expect(veiculos).toHaveLength(1);
 
         const atualizado = await buscarPorId('veiculos', veiculo.id);
+
         expect(atualizado.Id).toBe(veiculo.id);
         expect(atualizado.Modelo).toBe('Corolla XEi');
         expect(atualizado.Ano).toBe(2021);
@@ -334,36 +408,44 @@ describe('API de veículos', () => {
         expect(Number(atualizado.Valor)).toBe(105000);
     });
 
-    it('CT-015 - deve excluir um veículo existente e não listá-lo em nova consulta.', async () => {
+    it('CT-015 - deve excluir um veículo existente.', async () => {
         const veiculo = await criarVeiculo();
 
-        const response = await request(app).delete(`/veiculos/${veiculo.id}`);
+        const response = await request(app).delete(
+            `/veiculos/${veiculo.id}`
+        );
 
         expect(response.status).toBe(200);
-        expect(response.body.message).toBe('Veículo deletado com sucesso');
+        expect(response.body.message).toBe(
+            'Veículo deletado com sucesso'
+        );
 
         const consulta = await request(app).get('/veiculos');
+
         expect(consulta.status).toBe(200);
-        expect(consulta.body.data.find(v => v.Id === veiculo.id)).toBeUndefined();
+        expect(
+            consulta.body.data.find(v => v.Id === veiculo.id)
+        ).toBeUndefined();
     });
 });
 
-/* ------------------------------------------------------------------ */
-/* Suíte: Integração e Mock (CT-016 a CT-018)                         */
-/* Testa a função consultarCep isolada, com o axios mockado.          */
-/* ------------------------------------------------------------------ */
+/* INTEGRAÇÃO COM VIACEP: CT-016 a CT-018 */
+
 describe('Consulta de CEP com mock da API ViaCEP', () => {
     afterEach(() => {
         vi.resetAllMocks();
     });
 
-    it('CT-016 - deve retornar o endereço conforme a resposta simulada de um CEP válido.', async () => {
+    it('CT-016 - deve retornar o endereço de um CEP válido.', async () => {
         axios.get.mockResolvedValueOnce(RESPOSTA_VIACEP);
 
         const endereco = await consultarCep('01001-000');
 
         expect(axios.get).toHaveBeenCalledTimes(1);
-        expect(axios.get).toHaveBeenCalledWith('https://viacep.com.br/ws/01001000/json/');
+        expect(axios.get).toHaveBeenCalledWith(
+            'https://viacep.com.br/ws/01001000/json/'
+        );
+
         expect(endereco).toEqual({
             cep: '01001000',
             logradouro: 'Praça da Sé',
@@ -373,59 +455,99 @@ describe('Consulta de CEP com mock da API ViaCEP', () => {
         });
     });
 
-    it('CT-017 - deve tratar corretamente um CEP inexistente (erro=true).', async () => {
-        axios.get.mockResolvedValueOnce({ data: { erro: true } });
+    it('CT-017 - deve tratar um CEP inexistente.', async () => {
+        axios.get.mockResolvedValueOnce({
+            data: { erro: true }
+        });
 
-        await expect(consultarCep('99999-999')).rejects.toThrow('CEP não encontrado');
+        await expect(
+            consultarCep('99999-999')
+        ).rejects.toThrow('CEP não encontrado');
+
         expect(axios.get).toHaveBeenCalledTimes(1);
     });
 
-    it('CT-018 - deve propagar de forma controlada uma falha de conexão com a API ViaCEP.', async () => {
-        axios.get.mockRejectedValueOnce(new Error('Network Error'));
+    it('CT-018 - deve tratar uma falha de conexão com o ViaCEP.', async () => {
+        axios.get.mockRejectedValueOnce(
+            new Error('Network Error')
+        );
 
-        await expect(consultarCep('01001000')).rejects.toThrow('Network Error');
+        await expect(
+            consultarCep('01001000')
+        ).rejects.toThrow('Network Error');
+
         expect(axios.get).toHaveBeenCalledTimes(1);
     });
 });
 
-/* ------------------------------------------------------------------ */
-/* Suíte: Integração com banco (CT-019)                               */
-/* ------------------------------------------------------------------ */
+/* INTEGRAÇÃO COM BANCO: CT-019 */
+
 describe('Integração com o banco de testes', () => {
     afterEach(async () => {
         await clearDatabase();
     });
 
-    it('CT-019 - deve listar os veículos do banco de teste em JSON com status 200.', async () => {
-        const montadora = await MontadoraFactory.create('Toyota', 'Japão');
-        const cliente = await ClienteFactory.create(
-            'Ana Lima', '11122233344', '01001000',
-            'Rua B', 'Centro', 'São Paulo', 'SP', '20', null
+    it('CT-019 - deve listar os veículos em formato JSON.', async () => {
+        const montadora = await MontadoraFactory.create(
+            'Toyota',
+            'Japão'
         );
-        await VeiculoFactory.create('Corolla', 'ABC1D23', 2020, 'Preto', 98000, cliente.id, montadora.id);
-        await VeiculoFactory.create('Etios', 'DEF4G56', 2019, 'Prata', 52000, cliente.id, montadora.id);
+
+        const cliente = await ClienteFactory.create(
+            'Ana Lima',
+            '11122233344',
+            '01001000',
+            'Rua B',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '20',
+            null
+        );
+
+        await VeiculoFactory.create(
+            'Corolla',
+            'ABC1D23',
+            2020,
+            'Preto',
+            98000,
+            cliente.id,
+            montadora.id
+        );
+
+        await VeiculoFactory.create(
+            'Etios',
+            'DEF4G56',
+            2019,
+            'Prata',
+            52000,
+            cliente.id,
+            montadora.id
+        );
 
         const response = await request(app).get('/veiculos');
 
         expect(response.status).toBe(200);
-        expect(response.headers['content-type']).toMatch(/application\/json/);
+        expect(response.headers['content-type']).toMatch(
+            /application\/json/
+        );
         expect(Array.isArray(response.body.data)).toBe(true);
         expect(response.body.data).toHaveLength(2);
-        // A consulta ordena por modelo.
-        expect(response.body.data.map(v => v.Modelo)).toEqual(['Corolla', 'Etios']);
+
+        expect(
+            response.body.data.map(v => v.Modelo)
+        ).toEqual(['Corolla', 'Etios']);
     });
 });
 
-/* ------------------------------------------------------------------ */
-/* Suíte: Tratamento de erros (CT-020)                                */
-/* ------------------------------------------------------------------ */
+/* TRATAMENTO DE ERROS: CT-020 */
+
 describe('Tratamento de erros da API', () => {
     afterEach(async () => {
         await clearDatabase();
     });
 
-    it('CT-020 - deve retornar erro 500 em uma falha do banco sem encerrar o servidor.', async () => {
-        // Montadora e cliente inexistentes: o INSERT viola as chaves estrangeiras.
+    it('CT-020 - deve tratar erro no cadastro e manter a API funcionando.', async () => {
         const response = await request(app)
             .post('/veiculos')
             .send({
@@ -443,8 +565,104 @@ describe('Tratamento de erros da API', () => {
         expect(response.body.error).toBeTruthy();
         expect(await listar('veiculos')).toHaveLength(0);
 
-        // A API continua respondendo normalmente após o erro.
         const proximaRequisicao = await request(app).get('/montadoras');
+
         expect(proximaRequisicao.status).toBe(200);
+    });
+});
+
+/* CASOS ADICIONAIS: CT-021 a CT-024 */
+
+describe('Casos adicionais da API', () => {
+    afterEach(async () => {
+        await clearDatabase();
+        vi.resetAllMocks();
+    });
+
+    it('CT-021 - não deve cadastrar uma montadora com nome vazio.', async () => {
+        const response = await request(app)
+            .post('/montadoras')
+            .send({
+                nome: '',
+                pais: 'Japão'
+            });
+
+        expect(response.status).toBeGreaterThanOrEqual(400);
+        expect(await listar('montadoras')).toHaveLength(0);
+    });
+
+    it('CT-022 - deve retornar a lista de clientes em JSON.', async () => {
+        await ClienteFactory.create(
+            'Carlos Mendes',
+            '32165498700',
+            '01001000',
+            'Rua C',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '30',
+            null
+        );
+
+        const response = await request(app).get('/clientes');
+
+        expect(response.status).toBe(200);
+        expect(response.headers['content-type']).toMatch(
+            /application\/json/
+        );
+        expect(Array.isArray(response.body.data)).toBe(true);
+        expect(response.body.data).toHaveLength(1);
+        expect(response.body.data[0].Nome).toBe('Carlos Mendes');
+    });
+
+    it('CT-023 - não deve cadastrar veículo com cliente inexistente.', async () => {
+        const montadora = await MontadoraFactory.create(
+            'Honda',
+            'Japão'
+        );
+
+        const response = await request(app)
+            .post('/veiculos')
+            .send({
+                idMontadora: montadora.id,
+                idCliente: 999999,
+                modelo: 'Civic',
+                placa: 'XYZ1A23',
+                ano: 2022,
+                cor: 'Cinza',
+                valor: 120000
+            });
+
+        expect(response.status).toBeGreaterThanOrEqual(400);
+        expect(await listar('veiculos')).toHaveLength(0);
+    });
+
+    it('CT-024 - não deve cadastrar veículo com montadora inexistente.', async () => {
+        const cliente = await ClienteFactory.create(
+            'Marcos Lima',
+            '45678912300',
+            '01001000',
+            'Rua D',
+            'Centro',
+            'São Paulo',
+            'SP',
+            '40',
+            null
+        );
+
+        const response = await request(app)
+            .post('/veiculos')
+            .send({
+                idMontadora: 999999,
+                idCliente: cliente.id,
+                modelo: 'Accord',
+                placa: 'ABC2D34',
+                ano: 2021,
+                cor: 'Preto',
+                valor: 150000
+            });
+
+        expect(response.status).toBeGreaterThanOrEqual(400);
+        expect(await listar('veiculos')).toHaveLength(0);
     });
 });
